@@ -1,2 +1,2 @@
 # Prescripto
-Prescripto , A full stack web development project which is a Doctor appointment booking website which is built by using a MERN stack
+Prescripto – A full-stack Doctor Appointment Booking website built using the MERN stack (MongoDB, Express.js, React, Node.js).
