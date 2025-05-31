@@ -5,6 +5,9 @@ import jwt from 'jsonwebtoken'
 import {v2 as cloudinary} from 'cloudinary'
 import doctorModel from '../models/doctorModel.js'
 import appointmentModel from '../models/appointmentModel.js'
+import axios from 'axios'
+import { v4 as uuidv4 } from 'uuid'  // <-- added for UUID generation
+import dotenv from 'dotenv';
 
 
 // API to register user
@@ -183,5 +186,112 @@ const bookAppointment = async(req,res) => {
    }
 }
 
+// API to get user appointments for frontend my-appointments page
 
-export {registerUser,loginUser,getProfile,updateProfile,bookAppointment}
+const listAppointment = async (req,res) =>
+{
+   try{
+     const {userId} = req.body
+     const appointments = await appointmentModel.find({userId})
+
+     res.json({success:true,appointments})
+   }
+   catch(error)
+   {
+      console.log(error)
+      res.json({success:false,message:error.message})
+   }
+}
+
+// API to cancel appointment
+const cancelAppointment = async (req,res) => {
+   try{
+     const {userId,appointmentId} = req.body
+     const appointmentData = await appointmentModel.findById(appointmentId)
+
+   //   verify appointment user
+     if(appointmentData.userId.toString() !== userId)
+     {
+        return res.json({success:false,message:'Unauthorized action'})
+     }
+     await appointmentModel.findByIdAndUpdate(appointmentId,{cancelled:true})
+   //   releasing doctor slot
+
+      const {docId,slotDate,slotTime} = appointmentData
+
+      const doctorData = await doctorModel.findById(docId)
+
+      let slots_booked = doctorData.slots_booked
+
+      slots_booked[slotDate] = slots_booked[slotDate].filter(e => e !== slotTime)
+
+      await doctorModel.findByIdAndUpdate(docId,{slots_booked})
+
+      res.json({success:true,message:'Appointment Cancelled'})
+
+   }
+   catch(error)
+   {
+      console.log(error)
+      res.json({success:false,message:error.message})
+
+   }
+}
+
+
+// API to create Cashfree order
+
+dotenv.config();
+
+const createCashfreeOrder = async (req, res) => {
+
+  try {
+    const { amount, customer_phone, userId } = req.body;
+
+    if (!amount || !customer_phone || !userId) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-client-id': process.env.CASHFREE_APP_ID,
+      'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+      'x-api-version': '2022-01-01'
+    };
+
+    const body = {
+      order_amount: amount,
+      order_currency: 'INR',
+      customer_details: {
+        customer_id: userId,
+        customer_phone: customer_phone,
+        customer_email: "test@example.com"
+      }
+    };
+
+    const response = await axios.post('https://sandbox.cashfree.com/pg/orders', body, { headers });
+
+    return res.status(200).json(response.data);
+
+  } catch (error) {
+    console.error("Cashfree error:", error.response?.data || error.message);
+    return res.status(error.response?.status || 500).json({
+      message: "Payment initiation failed",
+      details: error.response?.data || error.message
+    });
+  }
+};
+
+
+
+
+export {
+  registerUser,
+  loginUser,
+  getProfile,
+  updateProfile,
+  bookAppointment,
+  listAppointment,
+  cancelAppointment,
+  createCashfreeOrder
+}
