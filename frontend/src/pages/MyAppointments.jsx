@@ -92,46 +92,40 @@ const MyAppointments = () => {
   };
 
   const payOnline = async (appointment, phone) => {
-  const normalizedPhone = normalizePhone(phone);
-  if (!validatePhone(normalizedPhone)) {
-    toast.error('Please enter a valid phone number, e.g. +919090407368 or 9090407368');
-    return;
-  }
-
-  const userId = getUserIdFromToken(token);
-  if (!userId) {
-    toast.error('User authentication error. Please login again.');
-    return;
-  }
-
-  try {
-    console.log('Sending payment request...');
-    const { data } = await axios.post(
-      `${backendUrl}/api/user/create-cashfree-order`,
-      { amount: appointment.amount, customer_phone: normalizedPhone, userId },
-      { headers: { token } }
-    );
-
-    console.log('Payment response from backend:', data);
-
-    // Check if order_token or payment_link is present to confirm success
-    if (data.order_token || data.payment_link) {
-      // Use payment_link if available, else build URL manually from order_token
-      const paymentUrl = data.payment_link
-        ? data.payment_link
-        : `https://sandbox.cashfree.com/pg/payment/order/${data.order_token}`;
-
-      window.open(paymentUrl, '_blank');
-      setShowPhoneModalFor(null);
-    } else {
-      toast.error(data.message || 'Payment initiation failed');
+    const normalizedPhone = normalizePhone(phone);
+    if (!validatePhone(normalizedPhone)) {
+      toast.error('Please enter a valid phone number, e.g. +919090407368 or 9090407368');
+      return;
     }
-  } catch (error) {
-    console.error('Payment request failed:', error);
-    toast.error(error.response?.data?.message || error.message);
-  }
-};
 
+    const userId = getUserIdFromToken(token);
+    if (!userId) {
+      toast.error('User authentication error. Please login again.');
+      return;
+    }
+
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/user/create-cashfree-order`,
+        { amount: appointment.amount, customer_phone: normalizedPhone, userId },
+        { headers: { token } }
+      );
+
+      if (data.order_token || data.payment_link) {
+        const paymentUrl = data.payment_link
+          ? data.payment_link
+          : `https://sandbox.cashfree.com/pg/payment/order/${data.order_token}`;
+
+        window.open(paymentUrl, '_blank');
+        setShowPhoneModalFor(null);
+      } else {
+        toast.error(data.message || 'Payment initiation failed');
+      }
+    } catch (error) {
+      console.error('Payment request failed:', error);
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
 
   const handleModalConfirm = () => {
     const appointment = appointments.find((appt) => appt._id === showPhoneModalFor);
@@ -177,7 +171,15 @@ const MyAppointments = () => {
               </p>
             </div>
             <div className="flex flex-col gap-2 justify-end">
-              {!item.cancelled ? (
+              {item.isCompleted ? (
+                <button className="sm:min-w-48 py-2 border border-green-500 rounded text-green-600">
+                  Appointment Completed
+                </button>
+              ) : item.cancelled ? (
+                <button className="sm:min-w-48 py-2 border border-red-500 rounded text-red-500">
+                  Appointment Cancelled
+                </button>
+              ) : (
                 <>
                   <button
                     onClick={() => handlePayClick(item)}
@@ -189,13 +191,9 @@ const MyAppointments = () => {
                     onClick={() => cancelAppointment(item._id)}
                     className="text-sm text-stone-500 text-center sm:min-w-48 py-2 border rounded hover:bg-red-500 hover:text-white transition-all duration-300"
                   >
-                    Cancel appointment
+                    Cancel Appointment
                   </button>
                 </>
-              ) : (
-                <button className="sm:min-w-48 py-2 border border-red-500 rounded text-red-500">
-                  Appointment cancelled
-                </button>
               )}
             </div>
           </div>
